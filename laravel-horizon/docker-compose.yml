@@ -1,0 +1,85 @@
+name: ${DOCKER_WORKSPACE}.HORIZON-DOCKER
+
+services:
+    horizon:
+        build:
+            context: .
+            dockerfile: ./docker/dockerfile
+        container_name: ${DOCKER_WORKSPACE}.horizon
+        restart: always
+        links:
+          - database
+          - redis
+        depends_on:
+            - redis
+            - database
+        volumes:
+          - .:/var/www/html:delegated
+        command: sh -c "php-fpm && php artisan migrate && php artisan horizon"
+        expose:
+            - "9000"
+        networks:
+            - app-network
+    redis:
+        build:
+            context: .
+            dockerfile: ./docker/redis.dockerfile
+        container_name: ${DOCKER_WORKSPACE}.redis
+        restart: unless-stopped
+        ports:
+            - "${DOCKER_REDIS_PORT}:6379"
+        networks:
+            - app-network
+    database:
+        build:
+            context: .
+            dockerfile: ./docker/db.dockerfile
+        container_name: ${DOCKER_WORKSPACE}.db
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DOCKER_DB_DATABASE}
+            MYSQL_PASSWORD: ${DOCKER_DB_PASSWORD}
+            MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+            MYSQL_ROOT_HOST: "%"
+        ports:
+            - "${DOCKER_DB_PORT}:3307"
+        volumes:
+            - dbdata:/var/lib/mysql
+        networks:
+            - app-network
+    nginx:
+        build:
+            context: .
+            dockerfile: ./docker/nginx.dockerfile
+        ports:
+        - "8080:8080"
+        networks:
+        - app-network
+        volumes:
+        - .:/var/www/html
+        - ./storage/logs/nginx:/var/log/nginx/
+        container_name: ${DOCKER_WORKSPACE}.nginx
+    node:
+        build:
+            context: .
+            dockerfile: ./docker/node.dockerfile
+        container_name: ${DOCKER_WORKSPACE}.node
+        working_dir: /var/www/html
+        volumes:
+          - .:/var/www/html
+        depends_on:
+          - horizon
+        command: sh -c "npm install -y && npm run dev"
+        ports:
+          - "5173:5173"
+        networks:
+          - app-network
+
+volumes:
+    dbdata:
+
+networks:
+
+    app-network:
+        name: ${DOCKER_NETWORK}
+        driver: bridge

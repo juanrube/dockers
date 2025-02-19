@@ -1,4 +1,4 @@
-version: "3"
+name: "Mailhog"
 services:
   mailhog:
     image: mailhog/mailhog:latest
